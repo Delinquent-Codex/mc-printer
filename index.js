@@ -27,7 +27,7 @@ const banner = `
     ██      ██  ██████       ██      ██   ██ ██ ██   ████    ██    ███████ ██   ██ 
 `;
 
-let bot, mcdata;
+let bot;
 
 let printData = {
     isPrinting: false,
@@ -290,7 +290,7 @@ function joinServer(server="localhost", portNumber) {
     bot.task = [];
 
     bot.once('spawn', ()=>{
-        mcdata = require('minecraft-data')(bot.version);
+        actions.init(bot);
 
         bot.settings = settings;
 
