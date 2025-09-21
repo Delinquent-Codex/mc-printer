@@ -1,6 +1,5 @@
 const mineflayer = require('mineflayer');
-const actions = require("./actions.js");
-const vec3 = require('vec3');
+const actions = require('./actions.js');
 const getPixels = require('get-pixels');
 const fs = require('fs');
 
@@ -27,7 +26,7 @@ const banner = `
     ██      ██  ██████       ██      ██   ██ ██ ██   ████    ██    ███████ ██   ██ 
 `;
 
-let bot, mcdata;
+let bot;
 
 let printData = {
     isPrinting: false,
@@ -42,7 +41,7 @@ const reader = readline.createInterface({
 });
 
 let log = [
-    [COLOR.cyan, "Welcome to the himalayas!*"]
+    [COLOR.cyan, 'Welcome to the himalayas!*']
 ];
 
 function addLog(text, color='') {
@@ -71,8 +70,12 @@ function display() {
         console.log(`Printed: ${printData.bar}`);
     }
 
-    for (line of log) {
-        console.log(...line);
+    for (const entry of log) {
+        if (entry.length === 2) {
+            console.log(entry[0], entry[1]);
+        } else {
+            console.log(entry[0]);
+        }
     }
 
     process.stdout.write(reader._prompt+reader.line);
@@ -95,20 +98,53 @@ function saveSettings() {
 }
 
 async function drawImage(args) {
-    addLog("Drawing an image!", COLOR.green);
-
-    let image = await loadImage(args[1]);
-
-    let size = args[3].split('x').map(n=>parseInt(n));
-
-    if (size.length === 1) {
-        let scale = size[0]/image.shape[0];
-        size.push(Math.round(image.shape[1]*scale));
+    if (!bot) {
+        addLog('Join a server before drawing an image.', COLOR.yellow);
+        return;
     }
 
-    buildImage(
+    addLog('Drawing an image!', COLOR.green);
+
+    if (!args[1]) {
+        addLog('Usage: draw <image> <palette> <width>x<height>', COLOR.yellow);
+        return;
+    }
+
+    let image;
+    try {
+        image = await loadImage(args[1]);
+    } catch (error) {
+        addLog(`Failed to load image: ${error.message}`, COLOR.red);
+        return;
+    }
+
+    const paletteName = args[2] ?? 'concrete';
+    const paletteKeys = paletteName.split('+');
+    const missingPalettes = paletteKeys.filter((name) => !palettes[name]);
+
+    if (missingPalettes.length) {
+        addLog(`Unknown palette(s): ${missingPalettes.join(', ')}.`, COLOR.yellow);
+        return;
+    }
+    const sizeArgument = args[3];
+    let size = [];
+
+    if (sizeArgument) {
+        size = sizeArgument.split('x').map((value) => parseInt(value, 10)).filter((value) => !Number.isNaN(value));
+    }
+
+    if (size.length === 0) {
+        size = [image.shape[0], image.shape[1]];
+    }
+
+    if (size.length === 1) {
+        const scale = size[0] / image.shape[0];
+        size.push(Math.round(image.shape[1] * scale));
+    }
+
+    await buildImage(
         image,
-        palette=args[2],
+        paletteName,
         bot.entity.position.clone(),
         size,
     );
@@ -117,7 +153,11 @@ async function drawImage(args) {
 const commands = {};
 
 async function runCommand(commandText) {
-    const args = commandText.split(' ');
+    if (!commandText) {
+        return;
+    }
+
+    const args = commandText.trim().split(/\s+/);
 
     let command = commands[args[0]];
 
@@ -145,27 +185,33 @@ async function runCommand(commandText) {
             await drawImage(args);
             break;
         case 'gif':
-            addLog("Building a gif machine!", COLOR.green);
-            
-            let image = await loadImage(args[1]);
+            addLog('Building a gif machine!', COLOR.green);
 
-            let palette = palettes['new'];
+            try {
+                const image = await loadImage(args[1]);
+                const palette = palettes.new;
+                const size = args[2]?.split('x').map((n) => parseInt(n, 10)).filter((value) => !Number.isNaN(value)) || [];
 
-            let size = args[2].split('x').map(n=>parseInt(n));
+                if (size.length === 0) {
+                    size.push(image.shape[1], image.shape[2]);
+                }
 
-            if (size.length === 1) {
-                let scale = size[0]/image.shape[1];
-                size.push(Math.round(image.shape[2]*scale));
-            }
+                if (size.length === 1) {
+                    const scale = size[0] / image.shape[1];
+                    size.push(Math.round(image.shape[2] * scale));
+                }
 
-            for (let i = 0; i < 1; i++) {
-                await buildGif(
-                    image,
-                    palette,
-                    bot.entity.position.clone().offset(0, i, 0),
-                    size,
-                    i
-                );
+                for (let i = 0; i < 1; i++) {
+                    await buildGif(
+                        image,
+                        palette,
+                        bot.entity.position.clone().offset(0, i, 0),
+                        size,
+                        i
+                    );
+                }
+            } catch (error) {
+                addLog(`Failed to load gif source: ${error.message}`, COLOR.red);
             }
             break;
         case 'join':
@@ -195,8 +241,13 @@ async function runCommand(commandText) {
             addLog("Rotating!!!", COLOR.green);
             break;
         case 'sheep':
-            addLog("Sheeping!", COLOR.yellow);
-            actions.getWool(bot, args[1]);
+            if (!args[1]) {
+                addLog('Usage: sheep <wool_block>', COLOR.yellow);
+                break;
+            }
+
+            addLog('Sheeping!', COLOR.yellow);
+            await actions.getWool(bot, args[1]);
             break;
         default:
             addLog(`Command "${args[0]}" not found.`, COLOR.red);
@@ -208,13 +259,21 @@ commands.chunk = async (arguments)=>{
         addLog(`Chunk size is ${settings.chunkSize}.`);
         return;
     }
-    settings.chunkSize = parseInt(arguments[1]);
+    const size = parseInt(arguments[1], 10);
+
+    if (Number.isNaN(size) || size <= 0) {
+        addLog('Chunk size must be a positive number.', COLOR.yellow);
+        return;
+    }
+
+    settings.chunkSize = size;
     addLog(`Chunk size set to ${settings.chunkSize}.`);
     saveSettings();
 };
 
 commands.clear = async ()=>{
     log = [];
+    addLog('Console cleared.', COLOR.green);
 };
 
 commands.color = async (arguments)=>{
@@ -237,18 +296,27 @@ commands.model = async (arguments)=>{
 
     const modelPath = arguments[1];
     const textureLocation = arguments[2];
-    const modelSize = parseInt(arguments[3]) || 20;
+    const modelSize = parseInt(arguments[3], 10) || 20;
 
-    addLog("Building model....", COLOR.green);
+    if (!modelPath || !textureLocation) {
+        addLog('Usage: model <model.obj> <texture.png> [size]', COLOR.yellow);
+        return;
+    }
 
-    await buildModel(bot, {
-        path: modelPath,
-        textureLocation: textureLocation,
-        position: bot.entity.position,
-        size: modelSize,
-    });
+    addLog('Building model....', COLOR.green);
 
-    addLog("Model has been built.", COLOR.green);
+    try {
+        await buildModel(bot, {
+            path: modelPath,
+            textureLocation: textureLocation,
+            position: bot.entity.position,
+            size: modelSize,
+        });
+
+        addLog('Model has been built.', COLOR.green);
+    } catch (error) {
+        addLog(`Model build failed: ${error.message}`, COLOR.red);
+    }
 }
 
 function inputLoop(command) {
@@ -270,7 +338,7 @@ function joinServer(server="localhost", portNumber) {
 
     bot = mineflayer.createBot({
         host: server,
-        username: "PrinterBot",
+        username: 'PrinterBot',
         port: portNumber,
     });
 
@@ -290,14 +358,14 @@ function joinServer(server="localhost", portNumber) {
     bot.task = [];
 
     bot.once('spawn', ()=>{
-        mcdata = require('minecraft-data')(bot.version);
+        actions.init(bot);
 
         bot.settings = settings;
 
         bot.loadPlugin(mcColor);
         bot.palettes = palettes;
 
-        addLog("Joined server.", COLOR.green);
+        addLog('Joined server.', COLOR.green);
         bot.chat("I'm a happy little robot.");
     });
 
@@ -308,8 +376,13 @@ function joinServer(server="localhost", portNumber) {
 }
 
 async function loadImage(path) {
-    return new Promise(resolve=>{
+    return new Promise((resolve, reject)=>{
         getPixels(path, (err, image)=>{
+            if (err) {
+                reject(err);
+                return;
+            }
+
             resolve(image);
         });
     });
@@ -325,7 +398,7 @@ function getBlock(image, x, z, palette=palettes.concrete, gif=false, t=1) {
         r = image.get(x, z, 0);
         g = image.get(x, z, 1);
         b = image.get(x, z, 2);
-        alpha = image.get(x, z, 2);
+        alpha = image.shape[2] > 3 ? image.get(x, z, 3) : 255;
     } else {
         x = Math.floor(image.shape[1]*x);
         z = Math.floor(image.shape[2]*z);
@@ -354,19 +427,20 @@ async function buildImage(texture, palette, startPosition=bot.entity.position.cl
             printData.progress = x/size[0];
             printData.bar = createBar(printData.progress*20);
 
-            for (xx = 0; xx < settings.chunkSize && x+xx < size[0]; xx++) {
-                let k = x+xx;
+            for (let xx = 0; xx < settings.chunkSize && x+xx < size[0]; xx++) {
+                const k = x+xx;
 
-                let block = getBlock(texture, k/size[0], z/size[1], palette);
-            
+                const block = getBlock(texture, k/size[0], z/size[1], palette);
+                const targetPosition = startPosition.offset(k, 0, z);
+
                 if (settings.commands) {
-                    let pos = startPosition.offset(k, 0, z).floor();
+                    const pos = targetPosition.floor();
                     bot.chat(`/setblock ${pos.x} ${pos.y} ${pos.z} ${block}`);
+                } else if (block && block !== 'air' && block !== 'cave_air' && block !== 'void_air') {
+                    await actions.placeBlock(bot, targetPosition, block);
                 } else {
-                    if (block) await actions.placeBlock(bot, startPosition.offset(k, 0, z), block);
-                    else await actions.clearBlock(bot, startPosition.offset(k, 0, z), block);
+                    await actions.clearBlock(bot, targetPosition);
                 }
-                //await bot.waitForTicks(1);
             }
             await bot.waitForTicks(1);
             z += zD;
@@ -394,19 +468,20 @@ async function buildGif(texture, palette, startPosition=bot.entity.position.clon
             printData.progress = x/size[0];
             printData.bar = createBar(printData.progress*20);
 
-            for (xx = 0; xx < settings.chunkSize && x+xx < size[0]; xx++) {
-                let k = x+xx;
+            for (let xx = 0; xx < settings.chunkSize && x+xx < size[0]; xx++) {
+                const k = x+xx;
 
-                let block = getBlock(texture, k/size[0], z/size[1], palette, gif=true, frame);
-            
+                const block = getBlock(texture, k/size[0], z/size[1], palette, gif=true, frame);
+                const targetPosition = startPosition.offset(k, 0, z);
+
                 if (settings.commands) {
-                    let pos = startPosition.offset(k, 0, z).floor();
+                    const pos = targetPosition.floor();
                     bot.chat(`/setblock ${pos.x} ${pos.y} ${pos.z} ${block}`);
+                } else if (block && block !== 'air' && block !== 'cave_air' && block !== 'void_air') {
+                    await actions.placeBlock(bot, targetPosition, block);
                 } else {
-                    if (block) await actions.placeBlock(bot, startPosition.offset(k, 0, z), block);
-                    else await actions.clearBlock(bot, startPosition.offset(k, 0, z), block);
+                    await actions.clearBlock(bot, targetPosition);
                 }
-                //await bot.waitForTicks(1);
             }
             await bot.waitForTicks(1);
             z += zD;
@@ -419,3 +494,4 @@ async function buildGif(texture, palette, startPosition=bot.entity.position.clon
     printData.isPrinting = false;
     bot.task.pop();
 }
+

@@ -5,47 +5,54 @@ const colourDistances = require('./colour-distances.js');
 const palettes = JSON.parse(fs.readFileSync('palettes.json', 'utf8'));
 
 function parsePaletteString(paletteString) {
-	let palette = [];
+    const palette = [];
 
-    for (p of paletteString.split('+')) {
-        palette.push(...palettes[p]);
+    for (const paletteName of paletteString.split('+')) {
+        if (palettes[paletteName]) {
+            palette.push(...palettes[paletteName]);
+        }
     }
 
     return palette;
 }
 
 function colorDistanceRGB([r1, g1, b1], [r2, g2, b2]) {
-	return colourDistances.rgb(r1, g1, b1, r2, g2, b2);
+    return colourDistances.rgb(r1, g1, b1, r2, g2, b2);
 }
 
 function colorDistanceLAB([r1, g1, b1], [r2, g2, b2]) {
-	//
+    return antiColor.deltaE(
+        antiColor.rgb2lab([r1, g1, b1]),
+        antiColor.rgb2lab([r2, g2, b2])
+    );
 }
 
-function getBlockFromColor(bot, [r, g, b, alpha], palette='zero-gravity', mode="rgb") {
-	if (typeof palette === "string") palette = parsePaletteString(palette);
+function getBlockFromColor(bot, [r, g, b, alpha], palette = 'zero-gravity', mode = 'rgb') {
+    const settings = bot.settings;
 
-	let settings = bot.settings;
+    if (typeof palette === 'string') {
+        palette = parsePaletteString(palette);
+    }
 
-	if (alpha === 0) return "air";
+    if (!palette.length) {
+        return 'air';
+    }
 
-	let best = palette[0];
+    if (alpha === 0) {
+        return 'air';
+    }
 
-	for (i in palette) {
+    let best = palette[0];
 
-        if (bot.settings.mode === "LAB") {
-            let sourceColor = antiColor.rgb2lab([r, g, b]);
-            let colA = antiColor.rgb2lab(best[settings.color]);
-            let colB = antiColor.rgb2lab(palette[i][settings.color]);
-            let disA = antiColor.deltaE(sourceColor, colA);
-            let disB = antiColor.deltaE(sourceColor, colB);
-            
-            best = disA < disB? best : palette[i];
-        } else if (bot.settings.mode === "RGB") {
-            let distanceA = colorDistanceRGB([r, g, b], best[settings.color]);
-            let distanceB = colorDistanceRGB([r, g, b], palette[i][settings.color]);
-
-            best = distanceA < distanceB? best : palette[i];
+    for (const swatch of palette.slice(1)) {
+        if (mode.toUpperCase() === 'LAB' || settings.mode === 'LAB') {
+            const disA = colorDistanceLAB([r, g, b], best[settings.color]);
+            const disB = colorDistanceLAB([r, g, b], swatch[settings.color]);
+            best = disA < disB ? best : swatch;
+        } else {
+            const distanceA = colorDistanceRGB([r, g, b], best[settings.color]);
+            const distanceB = colorDistanceRGB([r, g, b], swatch[settings.color]);
+            best = distanceA < distanceB ? best : swatch;
         }
     }
 
@@ -53,13 +60,12 @@ function getBlockFromColor(bot, [r, g, b, alpha], palette='zero-gravity', mode="
 }
 
 function plugin(bot) {
-	bot.colors = {};
+    bot.colors = {};
+    bot.colors.palettes = palettes;
 
-	bot.colors.palettes = palettes;
-
-	bot.colors.getBlock = (color, palette="zero-gravity", mode="rgb")=>{
-		return getBlockFromColor(bot, color, palette, mode);
-	}
+    bot.colors.getBlock = (color, palette = 'zero-gravity', mode = 'rgb')=>{
+        return getBlockFromColor(bot, color, palette, mode);
+    };
 }
 
 module.exports = plugin;

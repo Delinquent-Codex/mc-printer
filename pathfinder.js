@@ -13,11 +13,11 @@ function neighbours(bot, p) {
         p.offset( 1, 0, 0),
     ];
 
-    for (i in points) {
+    for (let i = 0; i < points.length; i++) {
         if (!clean(bot, points[i])) {
             points[i] = points[i].offset(0, 1, 0);
-        } else if (clean(bot, points[i], 0,-1, 0)) {
-            points[i] = points[i].offset(0,-1, 0);
+        } else if (clean(bot, points[i], 0, -1, 0)) {
+            points[i] = points[i].offset(0, -1, 0);
         }
     }
 
@@ -92,7 +92,7 @@ function pathfind(bot, start, end, range=1, maxLoops=100) {
             return path;
         }
 
-        for (neighbour of neighbours(bot, point.position)) {
+        for (const neighbour of neighbours(bot, point.position)) {
             let onClosedList = closedList.find((obj)=>{
                 return obj.position.distanceTo(neighbour) < 0.1;
             });
@@ -110,7 +110,7 @@ function pathfind(bot, start, end, range=1, maxLoops=100) {
                     root: point,
                 };
 
-                let previous = openList.find((obj)=>{
+                const previous = openList.find((obj)=>{
                     return obj.position.distanceTo(neighbour) < 0.1;
                 });
 
@@ -129,7 +129,7 @@ function pathfind(bot, start, end, range=1, maxLoops=100) {
         let point = openList.reduce((p, c)=>{
             return p.f < c.f ? p : c;
         });
-        let path = [];
+        const path = [];
         while (point.root) {
             path.push(point);
             point = point.root;

@@ -1,6 +1,9 @@
 # Minecraft Printer
 Minecraft Bot that prints images with blocks.
 
+✅ Updated for Minecraft 1.21 using the latest mineflayer APIs.
+✅ Improved image/model commands with better validation and block placement for modern versions.
+
 ![](https://raw.githubusercontent.com/MakkusuOtaku/mc-printer/main/examples/shrek.png)
 
 ```
