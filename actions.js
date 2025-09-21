@@ -1,10 +1,32 @@
-const mcdata = require("minecraft-data")('1.16.4');
-const Item = require('prismarine-item')('1.16.4')
+const minecraftData = require('minecraft-data');
+const prismarineItem = require('prismarine-item');
 const pathfinder = require("./pathfinder.js");
 const vec3 = require('vec3');
 const fs = require('fs');
 
-const woolBlocks = fs.readFileSync('wool-blocks.txt', 'utf8').split('\r\n');
+const woolBlocks = fs.readFileSync('wool-blocks.txt', 'utf8').split(/\r?\n/).filter(Boolean);
+
+let mcData;
+let Item;
+
+function init(bot) {
+    if (!bot?.version) {
+        throw new Error('Cannot initialise actions without a connected bot instance.');
+    }
+
+    mcData = minecraftData(bot.version);
+    Item = prismarineItem(bot.version);
+}
+
+function ensureData(bot) {
+    if (!mcData || !Item) {
+        if (!bot?.version) {
+            throw new Error('Bot version unavailable. Make sure the bot has spawned before calling action helpers.');
+        }
+
+        init(bot);
+    }
+}
 
 function sleep(time) {
     return new Promise(resolve=>setTimeout(resolve, time));
@@ -41,6 +63,7 @@ var lastSheep;
 
 const getWool = async (bot, block)=>{
     bot.task.push("collect wool");
+    ensureData(bot);
     let index = woolBlocks.indexOf(block);
 
     if (!lastSheep) {
@@ -109,7 +132,17 @@ function checkInventory(bot, itemName) {
 const equip = async (bot, item, slot='hand')=>{
     bot.task.push("equip");
 
-    let itemType = mcdata.itemsByName[item].id;
+    ensureData(bot);
+
+    const itemInfo = mcData.itemsByName[item];
+
+    if (!itemInfo) {
+        console.warn(`Unknown item "${item}" for version ${bot.version}.`);
+        bot.task.pop();
+        return;
+    }
+
+    let itemType = itemInfo.id;
 
     if (!checkInventory(bot, item)) {
         if (bot.game.gameMode == 'creative') {
@@ -129,6 +162,8 @@ const equip = async (bot, item, slot='hand')=>{
 
 const placeBlock = async (bot, position, type="dirt")=>{
     bot.task.push("place");
+
+    ensureData(bot);
 
     await clearBlock(bot, position).catch(console.log);
 
@@ -151,3 +186,4 @@ exports.getWool = getWool;
 exports.pathfind = pathfind;
 exports.clearBlock = clearBlock;
 exports.placeBlock = placeBlock;
+exports.init = init;
