@@ -12,42 +12,43 @@ draw image.png concrete+terracotta 64x64
 
 ### Commands
 
-```
-chunk 4
-```
-Sets the number of simultaneous blocks to place per tick to 4. Higher numbers are generally faster but might be bad for your computer.
+The console now ships with an upgraded command manager that understands quoted arguments (`draw "my image.png" …`) and long-form flags (for example `--origin 10 64 10`). Use the `help` command at any time for a live summary.
 
-```
-clear
-```
-Clears the logs in the console.
+#### Connection & status
 
-```
-color average
-```
-Use the average color of blocks for "calculations". You can also set it to "dominant". 
+| Command | Description |
+| --- | --- |
+| `join [host] [port] [--username name] [--version version]` | Connect the bot to a server. Omitting the host reuses the last one or defaults to `localhost`. |
+| `rejoin` | Reconnect using the last saved host, port and username. |
+| `status` | Display connection details, current tasks and printer progress. |
+| `stop` | Request cancellation of the active build; the bot stops after the current chunk finishes. |
 
-```
-commands on
-```
-Makes the bot use commands to place blocks. Can also be "off" to make the bot place them by hand.
+#### Printer configuration
 
-```
-draw image.png all 640x360
-```
-Makes the bot build image.png with a size of 640x360 out of any available blocks. If only one dimension is specified it'll be treated as the width and height will be inferred from the images original aspect ratio.
+| Command | Description |
+| --- | --- |
+| `palettes` | List every available palette key that can be combined (e.g. `concrete+terracotta`). |
+| `chunk [size]` | Get or set the number of blocks processed per tick while printing. |
+| `commands [on|off]` | Toggle between `/setblock` placement and survival-style block placement. |
+| `color [average|dominant]` | Pick which stored block colour swatch is used when matching pixels. |
+| `mode [rgb|lab]` | Switch colour-distance calculations between RGB and LAB. |
+| `settings [key] [value]` | Inspect or update persisted settings (chunk size, command placement, colour mode, etc.). |
+| `clear` | Clear the console log buffer. |
 
-```
-join localhost 12345
-```
-Attempts to join server "localhost" on port "12345". If you only provide a port it'll try to join localhost.
+#### Building
 
-```
-mode rgb
-```
-Measures the difference between colors using RGB. You can also use LAB.
+| Command | Description |
+| --- | --- |
+| `draw <image> <palette> <width>x<height>` | Build a still image using a palette or palette combination. Optional flags: `--size` (alternate width/height syntax), `--origin x,y,z` (absolute or `~`-relative anchor), `--offset x,y,z` (extra displacement), and `--no-offset` to suppress the default `+1,+0,+1` safety offset. |
+| `gif <image> [palette] [size]` | Print animated GIF frames vertically. Flags: `--frame` (single frame index), `--frames` (limit total frames), `--spacing` (vertical spacing), `--origin`, `--offset`, and `--no-offset`. |
+| `model <modelPath> <texturePath> [size]` | Render a textured OBJ model using `/setblock`. Supports `--type points` to place vertices only, plus the same `--origin`/`--offset` positioning flags. |
+| `sheep <colour_wool>` | Order the bot to shear and collect a specific wool colour while in survival mode. |
 
-```
-rejoin
-```
-Attempt to rejoin the last server.
+#### Help & diagnostics
+
+| Command | Description |
+| --- | --- |
+| `help [command]` | Show the full command list or detailed usage for a specific entry. |
+| `rot` | Placeholder rotation command (logged for compatibility). |
+
+During long builds the console now shows a progress bar, percentage, placed-block totals and the active task name. Issuing `stop` queues a graceful cancellation.
